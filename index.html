@@ -20,9 +20,6 @@
   <title>Grimpp Platform</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Security Headers -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
-
   <style>
     /* Estilo Oscuro Moderno */
     :root {
@@ -50,16 +47,10 @@
       color: var(--text-primary);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       overflow: hidden;
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      -webkit-touch-callout: none;
-      -webkit-tap-highlight-color: transparent;
     }
 
     /* Preloader con estilo oscuro */
-    #security-check {
+    #loading-overlay {
       position: fixed;
       top: 0;
       left: 0;
@@ -74,7 +65,7 @@
       transition: opacity 0.5s ease;
     }
 
-    .security-spinner {
+    .loading-spinner {
       width: 60px;
       height: 60px;
       border: 3px solid var(--border);
@@ -89,7 +80,7 @@
       100% { transform: rotate(360deg); }
     }
 
-    .security-text {
+    .loading-text {
       color: var(--text-secondary);
       font-size: 14px;
       text-align: center;
@@ -101,7 +92,7 @@
       50% { opacity: 1; }
     }
 
-    /* Warning overlay */
+    /* Warning overlay - solo en producción */
     #warning-overlay {
       position: fixed;
       top: 0;
@@ -158,17 +149,19 @@
       opacity: 1;
     }
 
-    /* Anti-debug styles */
-    .no-devtools {
-      position: absolute;
-      left: -9999px;
-      top: -9999px;
-      visibility: hidden;
-    }
-
-    /* Modern dark theme for Flutter content */
+    /* Modern dark theme para Flutter */
     flt-glass-pane {
       background: transparent !important;
+    }
+
+    /* Estilos para producción */
+    .production-mode body {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     /* Responsive design */
@@ -185,16 +178,16 @@
   </style>
 </head>
 <body>
-<!-- Security Check Overlay -->
-<div id="security-check">
-  <div class="security-spinner"></div>
-  <div class="security-text">
-    Verificando seguridad...<br>
-    <small>Grimpp Platform</small>
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">
+    Cargando Grimpp Platform...<br>
+    <small>Iniciando aplicación</small>
   </div>
 </div>
 
-<!-- Warning Overlay -->
+<!-- Warning Overlay (solo producción) -->
 <div id="warning-overlay">
   <div class="warning-content">
     <div class="warning-icon">⚠️</div>
@@ -209,293 +202,150 @@
 
 <!-- App Container -->
 <div id="app-container">
-  <!-- Flutter app will be injected here -->
+  <!-- Flutter app se carga aquí -->
 </div>
 
-<!-- Security Scripts -->
 <script>
   (function() {
     'use strict';
 
-    // Variables de seguridad
-    let devToolsOpen = false;
-    let warningShown = false;
-    let securityCheckPassed = false;
+    // Detectar modo de desarrollo
+    const isDevelopment = window.location.hostname === 'localhost' ||
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.port !== '' ||
+                         window.location.protocol === 'file:';
 
-    // Elementos del DOM
-    const securityCheck = document.getElementById('security-check');
+    console.log('%cGrimpp Platform', 'color: #007acc; font-size: 20px; font-weight: bold;');
+    console.log(`%cModo: ${isDevelopment ? 'Desarrollo' : 'Producción'}`,
+                `color: ${isDevelopment ? '#4CAF50' : '#ff9800'}; font-weight: bold;`);
+
+    // Variables de control
+    let loadingComplete = false;
+    const loadingOverlay = document.getElementById('loading-overlay');
     const warningOverlay = document.getElementById('warning-overlay');
     const appContainer = document.getElementById('app-container');
 
-    // Desactivar clic derecho
-    document.addEventListener('contextmenu', function(e) {
-      e.preventDefault();
-      showDevToolsWarning();
-      return false;
-    });
+    // Solo aplicar seguridad en producción
+    if (!isDevelopment) {
+      document.body.classList.add('production-mode');
 
-    // Desactivar shortcuts de teclado peligrosos
-    document.addEventListener('keydown', function(e) {
-      // F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, Ctrl+Shift+C
-      if (e.keyCode === 123 ||
-          (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
-          (e.ctrlKey && e.keyCode === 85)) {
+      // Desactivar clic derecho solo en producción
+      document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
-        e.stopPropagation();
-        showDevToolsWarning();
+        showSecurityWarning();
         return false;
-      }
+      });
 
-      // Desactivar Ctrl+A, Ctrl+S, Ctrl+P
-      if (e.ctrlKey && (e.keyCode === 65 || e.keyCode === 83 || e.keyCode === 80)) {
-        e.preventDefault();
-        return false;
-      }
-    });
-
-    // Detectar DevTools por tamaño de ventana
-    function detectDevToolsBySize() {
-      const widthThreshold = window.outerWidth - window.innerWidth > 160;
-      const heightThreshold = window.outerHeight - window.innerHeight > 160;
-
-      if (widthThreshold || heightThreshold) {
-        if (!devToolsOpen) {
-          devToolsOpen = true;
-          showDevToolsWarning();
-        }
-      } else {
-        if (devToolsOpen) {
-          devToolsOpen = false;
-          hideDevToolsWarning();
-        }
-      }
-    }
-
-    // Detectar DevTools por console.log
-    function detectDevToolsByConsole() {
-      const element = new Image();
-      let devToolsDetected = false;
-
-      Object.defineProperty(element, 'id', {
-        get: function() {
-          devToolsDetected = true;
-          showDevToolsWarning();
-          throw new Error('DevTools detected');
+      // Desactivar shortcuts peligrosos solo en producción
+      document.addEventListener('keydown', function(e) {
+        if (e.keyCode === 123 ||
+            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
+            (e.ctrlKey && e.keyCode === 85)) {
+          e.preventDefault();
+          showSecurityWarning();
+          return false;
         }
       });
 
-      setTimeout(() => {
-        try {
-          console.log(element);
-          console.clear();
-        } catch (e) {
-          // DevTools detected
+      // Detectar DevTools solo en producción
+      let devToolsCheckInterval = setInterval(function() {
+        if (!loadingComplete) return;
+
+        const widthThreshold = window.outerWidth - window.innerWidth > 160;
+        const heightThreshold = window.outerHeight - window.innerHeight > 160;
+
+        if (widthThreshold || heightThreshold) {
+          showSecurityWarning();
         }
-      }, 100);
-    }
+      }, 2000); // Menos frecuente para no interferir
 
-    // Detectar debugger
-    function detectDebugger() {
-      setInterval(function() {
-        const start = new Date().getTime();
-        debugger;
-        const end = new Date().getTime();
-
-        if (end - start > 100) {
-          showDevToolsWarning();
-        }
-      }, 1000);
-    }
-
-    // Mostrar advertencia de DevTools
-    function showDevToolsWarning() {
-      if (!warningShown) {
-        warningShown = true;
+      // Función para mostrar advertencia de seguridad
+      function showSecurityWarning() {
         warningOverlay.style.display = 'flex';
         appContainer.style.display = 'none';
-
-        // Intentar cerrar la ventana
-        setTimeout(() => {
-          try {
-            window.close();
-          } catch (e) {
-            // No se puede cerrar
-          }
-        }, 3000);
       }
-    }
 
-    // Ocultar advertencia de DevTools
-    function hideDevToolsWarning() {
-      if (warningShown) {
-        warningShown = false;
+      // Función para ocultar advertencia
+      function hideSecurityWarning() {
         warningOverlay.style.display = 'none';
         appContainer.style.display = 'block';
       }
-    }
 
-    // Protección contra selección de texto
-    document.onselectstart = function() {
-      return false;
-    };
-
-    // Protección contra arrastrar
-    document.ondragstart = function() {
-      return false;
-    };
-
-    // Detectar focus/blur para detectar DevTools
-    let focusTime = Date.now();
-
-    window.addEventListener('focus', function() {
-      focusTime = Date.now();
-    });
-
-    window.addEventListener('blur', function() {
-      if (Date.now() - focusTime < 500) {
-        showDevToolsWarning();
-      }
-    });
-
-    // Monitoreo continuo
-    setInterval(detectDevToolsBySize, 500);
-    setInterval(detectDevToolsByConsole, 2000);
-
-    // Inicializar detectores
-    detectDebugger();
-
-    // Limpiar consola constantemente
-    setInterval(function() {
-      console.clear();
-      console.log('%cAcceso Denegado', 'color: #ff4444; font-size: 30px; font-weight: bold;');
-      console.log('%cEsta aplicación está protegida contra inspección.', 'color: #ff4444; font-size: 14px;');
-    }, 1000);
-
-    // Simulación de verificación de seguridad
-    setTimeout(function() {
-      securityCheckPassed = true;
-      securityCheck.style.opacity = '0';
-
-      setTimeout(function() {
-        securityCheck.style.display = 'none';
-        appContainer.classList.add('loaded');
-      }, 500);
-    }, 2000);
-
-    // Protección contra modificación del DOM
-    const observer = new MutationObserver(function(mutations) {
-      mutations.forEach(function(mutation) {
-        if (mutation.type === 'childList') {
-          // Verificar si se agregaron elementos sospechosos
-          mutation.addedNodes.forEach(function(node) {
-            if (node.nodeType === 1) { // Element node
-              if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') {
-                if (!node.hasAttribute('data-flutter-authorized')) {
-                  node.remove();
-                }
-              }
-            }
-          });
+      // Limpiar consola en producción
+      setInterval(function() {
+        if (loadingComplete) {
+          console.clear();
+          console.log('%cAcceso Restringido', 'color: #ff4444; font-size: 16px; font-weight: bold;');
+          console.log('%cEsta aplicación está protegida.', 'color: #ff4444;');
         }
-      });
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    // Prevenir iframe injection
-    window.addEventListener('beforeunload', function(e) {
-      if (window.top !== window.self) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    });
-
-    // Anti-XSS básico y protección service worker
-    window.addEventListener('message', function(e) {
-      // Solo aceptar mensajes de origen confiable
-      if (e.origin !== window.location.origin) {
-        return;
-      }
-
-      // Verificar mensajes de Flutter
-      if (e.data && e.data.type === 'flutter-initialized') {
-        console.log('%cFlutter inicializado de forma segura', 'color: #007acc;');
-      }
-    });
-
-    // Protección adicional para Flutter
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          registrations.forEach(function(registration) {
-            if (!registration.scope.includes(window.location.origin)) {
-              registration.unregister();
-            }
-          });
-        });
-      });
+      }, 5000);
     }
+
+    // Función para cargar Flutter
+    function initializeFlutter() {
+      // Ocultar loading después de un breve delay
+      setTimeout(function() {
+        loadingOverlay.style.opacity = '0';
+
+        setTimeout(function() {
+          loadingOverlay.style.display = 'none';
+          appContainer.classList.add('loaded');
+          loadingComplete = true;
+
+          console.log('%cAplicación lista', 'color: #4CAF50; font-weight: bold;');
+        }, 500);
+      }, 1500);
+    }
+
+    // Cargar Flutter script
+    function loadFlutterScript() {
+      const script = document.createElement('script');
+      script.src = 'flutter_bootstrap.js';
+      script.async = true;
+
+      script.onload = function() {
+        console.log('%cFlutter bootstrap cargado', 'color: #007acc;');
+        initializeFlutter();
+      };
+
+      script.onerror = function() {
+        console.error('%cError cargando Flutter', 'color: #ff4444; font-weight: bold;');
+
+        // Mostrar error en la interfaz
+        loadingOverlay.innerHTML = `
+          <div style="color: #ff4444; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+            <div style="font-size: 18px; margin-bottom: 10px;">Error al cargar la aplicación</div>
+            <div style="font-size: 14px; opacity: 0.7;">Intente recargar la página</div>
+            <button onclick="window.location.reload()"
+                    style="margin-top: 20px; padding: 10px 20px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer;">
+              Recargar
+            </button>
+          </div>
+        `;
+      };
+
+      document.body.appendChild(script);
+    }
+
+    // Inicializar cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadFlutterScript);
+    } else {
+      loadFlutterScript();
+    }
+
+    // Manejo de visibilidad de página
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden && !isDevelopment) {
+        console.log('Aplicación en segundo plano');
+      } else if (!document.hidden) {
+        console.log('Aplicación activa');
+      }
+    });
 
   })();
-
-  // Cargar script de Flutter de forma segura
-  function loadFlutterScript() {
-    const script = document.createElement('script');
-    script.src = 'flutter_bootstrap.js';
-    script.async = true;
-    script.setAttribute('data-flutter-authorized', 'true');
-
-    script.onload = function() {
-      console.log('%cFlutter cargado correctamente', 'color: #007acc; font-weight: bold;');
-
-      // Inicializar Flutter cuando esté listo
-      if (window._flutter && window._flutter.loader) {
-        window._flutter.loader.load({
-          serviceWorkerSettings: {
-            serviceWorkerVersion: null,
-          },
-          onEntrypointLoaded: function(engineInitializer) {
-            engineInitializer.initializeEngine().then(function(appRunner) {
-              appRunner.runApp();
-            });
-          }
-        });
-      }
-    };
-
-    script.onerror = function() {
-      console.error('%cError cargando Flutter', 'color: #ff4444; font-weight: bold;');
-      // Mostrar mensaje de error al usuario
-      securityCheck.innerHTML = `
-        <div style="color: #ff4444; text-align: center;">
-          <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
-          <div>Error cargando la aplicación</div>
-          <div style="font-size: 12px; margin-top: 10px;">Intente recargar la página</div>
-        </div>
-      `;
-    };
-
-    document.body.appendChild(script);
-  }
-
-  // Cargar Flutter después de las verificaciones de seguridad
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadFlutterScript);
-  } else {
-    loadFlutterScript();
-  }
-
 </script>
-
-<!-- Elemento trampa para detectores -->
-<div class="no-devtools">
-  <script>
-    console.log('Security check active');
-  </script>
-</div>
 
 </body>
 </html>
