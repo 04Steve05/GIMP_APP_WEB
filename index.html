@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base href="/GIMP_APP_WEB/">
+  <base href="/">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -92,50 +92,6 @@
       50% { opacity: 1; }
     }
 
-    /* Warning overlay - solo en producción */
-    #warning-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.95);
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-      backdrop-filter: blur(10px);
-    }
-
-    .warning-content {
-      background: var(--bg-secondary);
-      border: 2px solid #ff4444;
-      border-radius: 12px;
-      padding: 40px;
-      text-align: center;
-      max-width: 500px;
-      box-shadow: 0 20px 40px var(--shadow);
-    }
-
-    .warning-icon {
-      font-size: 48px;
-      color: #ff4444;
-      margin-bottom: 20px;
-    }
-
-    .warning-title {
-      font-size: 24px;
-      color: #ff4444;
-      margin-bottom: 15px;
-      font-weight: 600;
-    }
-
-    .warning-message {
-      color: var(--text-secondary);
-      line-height: 1.6;
-      margin-bottom: 20px;
-    }
 
     /* App container */
     #app-container {
@@ -154,26 +110,9 @@
       background: transparent !important;
     }
 
-    /* Estilos para producción */
-    .production-mode body {
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      -webkit-touch-callout: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
     /* Responsive design */
     @media (max-width: 768px) {
-      .warning-content {
-        margin: 20px;
-        padding: 30px 20px;
-      }
-
-      .warning-title {
-        font-size: 20px;
-      }
+      /* Responsive styles */
     }
   </style>
 </head>
@@ -184,19 +123,6 @@
   <div class="loading-text">
     Cargando Grimpp Platform...<br>
     <small>Iniciando aplicación</small>
-  </div>
-</div>
-
-<!-- Warning Overlay (solo producción) -->
-<div id="warning-overlay">
-  <div class="warning-content">
-    <div class="warning-icon">⚠️</div>
-    <div class="warning-title">Acceso Denegado</div>
-    <div class="warning-message">
-      Se ha detectado el uso de herramientas de desarrollador.<br>
-      Esta aplicación está protegida contra inspección no autorizada.<br>
-      <strong>Cierre las herramientas de desarrollador para continuar.</strong>
-    </div>
   </div>
 </div>
 
@@ -222,61 +148,15 @@
     // Variables de control
     let loadingComplete = false;
     const loadingOverlay = document.getElementById('loading-overlay');
-    const warningOverlay = document.getElementById('warning-overlay');
     const appContainer = document.getElementById('app-container');
 
-    // Solo aplicar seguridad en producción
+    // Limpiar consola en producción - sin bloquear la app
     if (!isDevelopment) {
-      document.body.classList.add('production-mode');
-
-      // Desactivar clic derecho solo en producción
-      document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        showSecurityWarning();
-        return false;
-      });
-
-      // Desactivar shortcuts peligrosos solo en producción
-      document.addEventListener('keydown', function(e) {
-        if (e.keyCode === 123 ||
-            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
-            (e.ctrlKey && e.keyCode === 85)) {
-          e.preventDefault();
-          showSecurityWarning();
-          return false;
-        }
-      });
-
-      // Detectar DevTools solo en producción
-      let devToolsCheckInterval = setInterval(function() {
-        if (!loadingComplete) return;
-
-        const widthThreshold = window.outerWidth - window.innerWidth > 160;
-        const heightThreshold = window.outerHeight - window.innerHeight > 160;
-
-        if (widthThreshold || heightThreshold) {
-          showSecurityWarning();
-        }
-      }, 2000); // Menos frecuente para no interferir
-
-      // Función para mostrar advertencia de seguridad
-      function showSecurityWarning() {
-        warningOverlay.style.display = 'flex';
-        appContainer.style.display = 'none';
-      }
-
-      // Función para ocultar advertencia
-      function hideSecurityWarning() {
-        warningOverlay.style.display = 'none';
-        appContainer.style.display = 'block';
-      }
-
-      // Limpiar consola en producción
+      // Solo limpiar consola, sin bloquear la app
       setInterval(function() {
         if (loadingComplete) {
           console.clear();
-          console.log('%cAcceso Restringido', 'color: #ff4444; font-size: 16px; font-weight: bold;');
-          console.log('%cEsta aplicación está protegida.', 'color: #ff4444;');
+          console.log('%cGrimpp Platform - Logs deshabilitados en producción', 'color: #007acc; font-size: 12px;');
         }
       }, 5000);
     }
